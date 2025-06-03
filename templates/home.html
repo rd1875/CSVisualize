@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV File Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/script.js"></script>
+    <style>
+        .drop-shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+    
+    <nav class="bg-gray-800 p-4 text-white flex justify-between items-center shadow-lg">
+        <a href="/" class="text-2xl font-bold">CSV Visualizer</a>
+        <div class="space-x-4">
+            <a href="/" class="hover:underline">Home</a>
+            <a href="/hiw" class="hover:underline">How It Works</a>
+            <a href="/features" class="hover:underline">Features</a>
+            <a href="/about" class="hover:underline">About</a>
+            <a href="/contact" class="hover:underline">Contact</a>
+            <a href="login" class="bg-white text-purple-800 px-4 py-2 rounded-lg hover:bg-gray-200">Login</a>
+        </div>
+    </nav>
+
+     <!-- Upload Section -->
+     <section id="upload-section" class="max-w-3xl mx-auto bg-white dark:bg-gray-800 shadow-lg p-6 rounded-lg mt-8">
+        <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-100">Upload CSV & Generate Graph</h2>
+
+        <!-- Drag & Drop -->
+        <div id="dropArea" class="drag-drop p-6 rounded-lg mt-4 text-center cursor-pointer bg-gray-100 dark:bg-gray-700 border-dashed border-2 border-gray-400 dark:border-gray-500">
+            <p class="text-purple-700 dark:text-purple-300 font-semibold">Drag & Drop Your File Here</p>
+            <p class="text-gray-500 dark:text-gray-400 text-sm">or click to select a file</p>
+            <input type="file" id="csvFile" class="hidden">
+        </div>
+
+        <!-- Column Selections -->
+        <div id="columnSelectors" class="hidden mt-6">
+            <label class="block">X-Axis:</label>
+            <select id="xAxis" class="border p-2 w-full rounded-md bg-gray-100 dark:bg-gray-700"></select>
+
+            <label class="block mt-3">Y-Axis:</label>
+            <select id="yAxis" class="border p-2 w-full rounded-md bg-gray-100 dark:bg-gray-700" multiple></select>
+
+            <label class="block mt-3">Graph Type:</label>
+            <select id="graphType" class="border p-2 w-full rounded-md bg-gray-100 dark:bg-gray-700">
+                <option value="bar">Bar Chart</option>
+                <option value="line">Line Chart</option>
+                <option value="scatter">Scatter Plot</option>
+                <option value="heatmap">Heatmap</option>
+            </select>
+
+            <button id="generateGraph" class="bg-purple-700 text-white px-4 py-2 mt-4 rounded w-full hover:bg-purple-600">Generate Graph</button>
+        </div>
+    </section>
+
+    <!-- Graph Display -->
+    <section id="graphContainer" class="max-w-3xl mx-auto mt-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg hidden">
+        <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-100">Generated Graph</h3>
+        <img id="graphImage" class="w-full mt-4 border rounded-lg">
+        <a id="downloadGraph" class="bg-green-500 text-white px-4 py-2 mt-4 rounded hidden block text-center hover:bg-green-600">Download Graph</a>
+    </section>
+
+    <!-- Statistics Display -->
+    <section id="statsContainer" class="max-w-3xl mx-auto mt-8 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg hidden">
+        <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-100">Statistics</h3>
+        <pre id="statsOutput" class="bg-gray-100 dark:bg-gray-700 p-3 rounded"></pre>
+    </section>
+
+    <div class="max-w-md mx-auto bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mt-8 text-center">
+        <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">New here?</h2>
+        <p class="text-gray-600 dark:text-gray-300 mt-2">
+            Learn how to upload, visualize, and download your data easily.
+        </p>
+        <a href="/hiw" class="mt-4 inline-block bg-purple-800 text-white px-5 py-3 rounded-lg hover:bg-purple-700 shadow-md">
+            See How It Works
+        </a>
+    </div>
+    
+
+    <script>
+        const dropArea = document.getElementById("dropArea");
+        const fileInput = document.getElementById("csvFile");
+
+        // Drag & Drop Functionality
+        dropArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropArea.classList.add("drag-over");
+        });
+
+        dropArea.addEventListener("dragleave", () => {
+            dropArea.classList.remove("drag-over");
+        });
+
+        dropArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropArea.classList.remove("drag-over");
+            fileInput.files = e.dataTransfer.files;
+            handleFileUpload(fileInput.files[0]);
+        });
+
+        dropArea.addEventListener("click", () => fileInput.click());
+
+        fileInput.addEventListener("change", function () {
+            handleFileUpload(this.files[0]);
+        });
+
+        function handleFileUpload(file) {
+            if (!file) return;
+            let formData = new FormData();
+            formData.append("csvFile", file);
+
+            fetch("/columns", { method: "POST", body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    document.getElementById("columnSelectors").classList.remove("hidden");
+
+                    let xAxisSelect = document.getElementById("xAxis");
+                    let yAxisSelect = document.getElementById("yAxis");
+
+                    xAxisSelect.innerHTML = "";
+                    yAxisSelect.innerHTML = "";
+
+                    data.columns.forEach(col => {
+                        xAxisSelect.appendChild(new Option(col, col));
+                        yAxisSelect.appendChild(new Option(col, col));
+                    });
+                });
+        }
+
+        document.getElementById("generateGraph").addEventListener("click", function () {
+    let file = fileInput.files[0];
+    let xAxis = document.getElementById("xAxis").value;
+    let yAxis = [...document.getElementById("yAxis").selectedOptions].map(opt => opt.value);
+    let graphType = document.getElementById("graphType").value;
+
+    if (!file || !xAxis || yAxis.length === 0 || !graphType) {
+        alert("Please select all required fields.");
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append("csvFile", file);
+    formData.append("xAxis", xAxis);
+    yAxis.forEach(y => formData.append("yAxis", y));
+    formData.append("graphType", graphType);
+
+    fetch("/upload", { method: "POST", body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert("Error: " + data.error);
+                return;
+            }
+
+            // Display the graph
+            let graphImage = document.getElementById("graphImage");
+            let downloadGraph = document.getElementById("downloadGraph");
+
+            document.getElementById("graphContainer").classList.remove("hidden");
+            graphImage.src = data.graph_url + "?t=" + Date.now(); // Force reload
+
+            // Enable download button
+            downloadGraph.classList.remove("hidden");
+            downloadGraph.href = data.graph_url;
+            downloadGraph.setAttribute("download", "graph.png");
+        })
+        .catch(error => alert("An error occurred: " + error));
+});
+
+        
+    </script>
+ 
+    
+    
+</body>
+</html>
